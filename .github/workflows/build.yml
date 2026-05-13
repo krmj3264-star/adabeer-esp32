@@ -1,0 +1,25 @@
+name: Build ESP32 Firmware
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('platformio.ini') }}
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO
+        run: pip install platformio
+      - name: Build Firmware
+        run: platformio run
+      - name: Upload BIN
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware
+          path: .pio/build/lilygo-t-hmi/firmware.bin
