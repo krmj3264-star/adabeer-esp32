@@ -32,7 +32,6 @@
 #define WHITE  0xFFFF
 #define GREEN  0x07E0
 #define YELLOW 0xFFE0
-#define BLUE   0x001F
 #define ORANGE 0xFCC0
 
 esp_lcd_panel_handle_t panel_handle = NULL;
@@ -109,9 +108,8 @@ void lcd_char(int x, int y, char c, uint16_t color, int sz) {
 }
 
 void lcd_text(int x, int y, const char* txt, uint16_t color, int sz) {
-    for (int i = 0; txt[i]; i++) {
+    for (int i = 0; txt[i]; i++)
         lcd_char(x + i*6*sz, y, txt[i], color, sz);
-    }
 }
 
 void lcd_init() {
@@ -120,42 +118,35 @@ void lcd_init() {
     pinMode(PIN_LCD_BL, OUTPUT); digitalWrite(PIN_LCD_BL, HIGH);
 
     esp_lcd_i80_bus_handle_t i80_bus = NULL;
-    esp_lcd_i80_bus_config_t bus_config = {
-        .dc_gpio_num = PIN_LCD_DC,
-        .wr_gpio_num = PIN_LCD_WR,
-        .clk_src = LCD_CLK_SRC_DEFAULT,
-        .data_gpio_nums = {
-            PIN_LCD_D0, PIN_LCD_D1, PIN_LCD_D2, PIN_LCD_D3,
-            PIN_LCD_D4, PIN_LCD_D5, PIN_LCD_D6, PIN_LCD_D7,
-        },
-        .bus_width = 8,
-        .max_transfer_bytes = LCD_W * LCD_H * 2,
-        .psram_trans_align = 64,
-        .sram_trans_align = 4,
-    };
+    esp_lcd_i80_bus_config_t bus_config = {};
+    bus_config.dc_gpio_num = PIN_LCD_DC;
+    bus_config.wr_gpio_num = PIN_LCD_WR;
+    bus_config.clk_src = LCD_CLK_SRC_XTAL;
+    bus_config.data_gpio_nums[0] = PIN_LCD_D0;
+    bus_config.data_gpio_nums[1] = PIN_LCD_D1;
+    bus_config.data_gpio_nums[2] = PIN_LCD_D2;
+    bus_config.data_gpio_nums[3] = PIN_LCD_D3;
+    bus_config.data_gpio_nums[4] = PIN_LCD_D4;
+    bus_config.data_gpio_nums[5] = PIN_LCD_D5;
+    bus_config.data_gpio_nums[6] = PIN_LCD_D6;
+    bus_config.data_gpio_nums[7] = PIN_LCD_D7;
+    bus_config.bus_width = 8;
+    bus_config.max_transfer_bytes = LCD_W * LCD_H * 2;
     esp_lcd_new_i80_bus(&bus_config, &i80_bus);
 
     esp_lcd_panel_io_handle_t io_handle = NULL;
-    esp_lcd_panel_io_i80_config_t io_config = {
-        .cs_gpio_num = PIN_LCD_CS,
-        .pclk_hz = 20 * 1000 * 1000,
-        .trans_queue_depth = 10,
-        .dc_levels = {
-            .dc_idle_level = 0,
-            .dc_cmd_level = 0,
-            .dc_dummy_level = 0,
-            .dc_data_level = 1,
-        },
-        .lcd_cmd_bits = 8,
-        .lcd_param_bits = 8,
-    };
+    esp_lcd_panel_io_i80_config_t io_config = {};
+    io_config.cs_gpio_num = PIN_LCD_CS;
+    io_config.pclk_hz = 20 * 1000 * 1000;
+    io_config.trans_queue_depth = 10;
+    io_config.lcd_cmd_bits = 8;
+    io_config.lcd_param_bits = 8;
+    io_config.dc_levels.dc_data_level = 1;
     esp_lcd_new_panel_io_i80(i80_bus, &io_config, &io_handle);
 
-    esp_lcd_panel_dev_config_t panel_config = {
-        .reset_gpio_num = -1,
-        .rgb_endian = LCD_RGB_ENDIAN_RGB,
-        .bits_per_pixel = 16,
-    };
+    esp_lcd_panel_dev_config_t panel_config = {};
+    panel_config.reset_gpio_num = -1;
+    panel_config.bits_per_pixel = 16;
     esp_lcd_new_panel_st7789(io_handle, &panel_config, &panel_handle);
     esp_lcd_panel_reset(panel_handle);
     esp_lcd_panel_init(panel_handle);
@@ -172,7 +163,7 @@ Preferences prefs;
 
 char wifi_ssid[32] = "";
 char wifi_password[64] = "";
-char totp_base32[128] = "aaaa bbbb cccc dddd eeee ffff gggg hhhh";
+char totp_base32[128] = "aaaa bbbb cccc dddd";
 const byte DNS_PORT = 53;
 bool settingsPortalActive = false;
 
@@ -185,7 +176,7 @@ void showScreen(const char* l1, const char* l2, const char* l3, uint16_t bg) {
 }
 
 void handlePortalRoot() {
-    String html = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><title>Tadabeer</title><style>body{margin:0;font-family:Arial;background:#0b0b0b;color:#fff;padding:22px;}input{width:100%;padding:12px;background:#111;color:#fff;border:1px solid #333;border-radius:8px;box-sizing:border-box;margin-bottom:10px;}.btn{padding:12px 20px;border-radius:8px;font-weight:700;cursor:pointer;border:none;background:#4d8ef7;color:#fff;width:100%;}</style></head><body>";
+    String html = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><title>Tadabeer</title><style>body{margin:0;font-family:Arial;background:#111;color:#fff;padding:20px;}input{width:100%;padding:12px;background:#222;color:#fff;border:1px solid #444;border-radius:8px;box-sizing:border-box;margin-bottom:10px;}.btn{padding:12px;border-radius:8px;font-weight:700;cursor:pointer;border:none;background:#4d8ef7;color:#fff;width:100%;}</style></head><body>";
     html += "<h2>Tadabeer Settings</h2><form method='POST' action='/save'>";
     html += "<label>WiFi SSID</label><input name='ssid' value='" + String(wifi_ssid) + "'>";
     html += "<label>WiFi Password</label><input name='pass' type='password'>";
@@ -215,7 +206,7 @@ void startPortal() {
     server.onNotFound(handlePortalRoot);
     server.begin();
     settingsPortalActive = true;
-    showScreen("PORTAL", "Connect to:", "Tadabeer Setup", 0x0010);
+    showScreen("PORTAL", "Connect to", "Tadabeer Setup", 0x0010);
 }
 
 void setup() {
