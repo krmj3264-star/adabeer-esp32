@@ -7,7 +7,11 @@
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 
-// ===== LilyGo T-HMI Official Pins =====
+// ===== LilyGo T-HMI V1.2 Official Pins =====
+#define PWR_ON_PIN  10
+#define BTN_SELECT   0
+#define BTN_BACK    21
+
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ST7789  _panel;
   lgfx::Bus_Parallel8 _bus;
@@ -20,8 +24,14 @@ public:
       cfg.pin_wr = 8;
       cfg.pin_rd = -1;
       cfg.pin_rs = 7;
-      cfg.pin_d0 = 48; cfg.pin_d1 = 47; cfg.pin_d2 = 39; cfg.pin_d3 = 40;
-      cfg.pin_d4 = 41; cfg.pin_d5 = 42; cfg.pin_d6 = 45; cfg.pin_d7 = 46;
+      cfg.pin_d0 = 48;
+      cfg.pin_d1 = 47;
+      cfg.pin_d2 = 39;
+      cfg.pin_d3 = 40;
+      cfg.pin_d4 = 41;
+      cfg.pin_d5 = 42;
+      cfg.pin_d6 = 45;
+      cfg.pin_d7 = 46;
       _bus.config(cfg);
       _panel.setBus(&_bus);
     }
@@ -42,9 +52,9 @@ public:
     }
     {
       auto cfg = _light.config();
-      cfg.pin_bl     = 38;
-      cfg.invert     = false;
-      cfg.freq       = 44100;
+      cfg.pin_bl      = 38;
+      cfg.invert      = false;
+      cfg.freq        = 44100;
       cfg.pwm_channel = 7;
       _light.config(cfg);
       _panel.setLight(&_light);
@@ -54,11 +64,6 @@ public:
 };
 
 LGFX tft;
-
-// ===== Buttons =====
-#define BTN_SELECT  0
-#define BTN_BACK    14
-#define PWR_PIN     10
 
 // ===== Portal =====
 const byte DNS_PORT = 53;
@@ -132,9 +137,15 @@ void drawMenu() {
     for (int i = 0; i < 2; i++) {
       if (i == selectedIndex) tft.setTextColor(TFT_BLACK, TFT_GREEN);
       else tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.setCursor(20, 50 + i*30);
+      tft.setCursor(20, 55 + i*35);
       tft.println(items[i]);
     }
+    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+    tft.setTextSize(1);
+    tft.setCursor(20, 130);
+    tft.println("Click=scroll  Hold=select");
+    tft.setCursor(20, 145);
+    tft.println("BACK=go back / Settings");
   }
 
   else if (currentScreen == SCREEN_PASSWORDS) {
@@ -143,13 +154,13 @@ void drawMenu() {
     tft.println("Passwords");
     if (passwordCount == 0) {
       tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-      tft.setCursor(20, 60); tft.println("No passwords yet");
-      tft.setCursor(20, 85); tft.println("Add via Settings");
+      tft.setCursor(20, 70); tft.println("No passwords yet");
+      tft.setCursor(20, 90); tft.println("Go to Settings to add");
     }
     for (int i = 0; i < passwordCount; i++) {
       if (i == selectedIndex) tft.setTextColor(TFT_BLACK, TFT_GREEN);
       else tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.setCursor(20, 50 + i*25);
+      tft.setCursor(20, 50 + i*28);
       tft.println(passwordNames[i]);
     }
   }
@@ -158,25 +169,28 @@ void drawMenu() {
     tft.setTextColor(TFT_GREEN);
     tft.setCursor(20, 10);
     tft.println(passwordNames[activePasswordIndex]);
-    const char* actions[] = {"Send Username", "Send Password", "Send Both"};
+    tft.drawFastHLine(0, 38, 240, TFT_DARKGREY);
+    const char* actions[] = {"Send Username", "Send Password", "User+Tab+Pass"};
     for (int i = 0; i < 3; i++) {
       if (i == selectedIndex) tft.setTextColor(TFT_BLACK, TFT_GREEN);
       else tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.setCursor(20, 50 + i*30);
+      tft.setCursor(20, 55 + i*35);
       tft.println(actions[i]);
     }
   }
 
   else if (currentScreen == SCREEN_SETTINGS) {
     tft.setTextColor(TFT_GREEN);
-    tft.setCursor(20, 10); tft.println("WiFi Portal");
+    tft.setCursor(20, 10);
+    tft.println("WiFi Portal");
+    tft.drawFastHLine(0, 38, 240, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setCursor(20, 50); tft.println("SSID: Dr.Passwords");
-    tft.setCursor(20, 80); tft.print("PASS: "); tft.println(apPassword);
+    tft.setCursor(20, 78); tft.print("PASS: "); tft.println(apPassword);
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
     tft.setTextSize(1);
     tft.setCursor(20, 115); tft.println("Connect WiFi then open browser");
-    tft.setCursor(20, 130); tft.println("Hold BACK to close portal");
+    tft.setCursor(20, 130); tft.println("Hold BACK button to close portal");
   }
 }
 
@@ -188,7 +202,7 @@ void sendSelected() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_CYAN);
   tft.setTextSize(2);
-  tft.setCursor(20, 50);
+  tft.setCursor(20, 60);
   tft.println("Sending...");
   delay(300);
   if (selectedIndex == 0) {
@@ -218,16 +232,16 @@ void startPortal() {
     html += "<title>Dr.Passwords</title>";
     html += "<style>body{background:#111;color:#fff;font-family:Arial;padding:20px;}";
     html += "input{width:100%;padding:10px;background:#222;color:#fff;border:1px solid #444;border-radius:6px;box-sizing:border-box;margin-bottom:10px;}";
-    html += ".btn{padding:10px 20px;background:#4d8ef7;color:#fff;border:none;border-radius:6px;cursor:pointer;width:100%;font-size:16px;}";
+    html += ".btn{padding:10px 20px;background:#4d8ef7;color:#fff;border:none;border-radius:6px;cursor:pointer;width:100%;font-size:16px;margin-bottom:8px;}";
     html += ".del{background:#c0392b;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;}";
     html += "table{width:100%;border-collapse:collapse;margin-top:20px;}";
     html += "th,td{padding:10px;border:1px solid #333;text-align:left;}th{background:#1a1a1a;}</style></head><body>";
     html += "<h2>Dr. Passwords</h2>";
     html += "<form method='POST' action='/save'>";
     html += "<input name='n' placeholder='Name (e.g. Gmail)'>";
-    html += "<input name='u' placeholder='Username'>";
+    html += "<input name='u' placeholder='Username or Email'>";
     html += "<input name='p' placeholder='Password' id='pw'>";
-    html += "<button type='button' class='btn' style='background:#555;margin-bottom:10px;' onclick=\"var c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';var s='';for(var i=0;i<16;i++)s+=c[Math.floor(Math.random()*c.length)];document.getElementById('pw').value=s;\">Generate Password</button>";
+    html += "<button type='button' class='btn' style='background:#555;' onclick=\"var c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';var s='';for(var i=0;i<16;i++)s+=c[Math.floor(Math.random()*c.length)];document.getElementById('pw').value=s;\">Generate Password</button>";
     html += "<button class='btn' type='submit'>Add Password</button></form>";
     if (passwordCount > 0) {
       html += "<table><tr><th>Name</th><th>Username</th><th></th></tr>";
@@ -292,10 +306,13 @@ void stopPortal() {
 // SETUP
 // =====================================================
 void setup() {
-  pinMode(PWR_PIN, OUTPUT);
-  digitalWrite(PWR_PIN, HIGH);
+  // Power ON - مهم جداً للوحة T-HMI V1.2
+  pinMode(PWR_ON_PIN, OUTPUT);
+  digitalWrite(PWR_ON_PIN, HIGH);
+  delay(100);
+
   pinMode(BTN_SELECT, INPUT_PULLUP);
-  pinMode(BTN_BACK, INPUT_PULLUP);
+  pinMode(BTN_BACK,   INPUT_PULLUP);
 
   tft.init();
   tft.setRotation(1);
@@ -303,11 +320,11 @@ void setup() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_GREEN);
   tft.setTextSize(3);
-  tft.setCursor(20, 60);
+  tft.setCursor(20, 50);
   tft.println("Dr.Passwords");
   tft.setTextSize(1);
   tft.setTextColor(TFT_DARKGREY);
-  tft.setCursor(20, 100);
+  tft.setCursor(20, 95);
   tft.println("Loading...");
   delay(1200);
 
@@ -337,7 +354,6 @@ void loop() {
       holdTriggered = false;
     } else if (!holdTriggered && millis() - pressStart > HOLD_MS) {
       holdTriggered = true;
-      // Hold = Enter / Send
       if (currentScreen == SCREEN_ACTIONS) {
         sendSelected();
       } else if (currentScreen == SCREEN_MAIN) {
@@ -355,11 +371,10 @@ void loop() {
     }
   } else {
     if (btnPressed && !holdTriggered) {
-      // Short click = scroll
       int maxItems = 0;
-      if (currentScreen == SCREEN_MAIN)      maxItems = 2;
-      else if (currentScreen == SCREEN_PASSWORDS) maxItems = max(1, passwordCount);
-      else if (currentScreen == SCREEN_ACTIONS)   maxItems = 3;
+      if (currentScreen == SCREEN_MAIN)           maxItems = 2;
+      else if (currentScreen == SCREEN_PASSWORDS)  maxItems = max(1, passwordCount);
+      else if (currentScreen == SCREEN_ACTIONS)    maxItems = 3;
       if (maxItems > 0) {
         selectedIndex = (selectedIndex + 1) % maxItems;
         drawMenu();
@@ -373,6 +388,10 @@ void loop() {
   if (digitalRead(BTN_BACK) == LOW) {
     delay(50);
     if (digitalRead(BTN_BACK) == LOW) {
+      unsigned long backStart = millis();
+      while (digitalRead(BTN_BACK) == LOW) delay(10);
+      unsigned long held = millis() - backStart;
+
       if (portalRunning) {
         stopPortal();
         currentScreen = SCREEN_MAIN;
@@ -391,7 +410,6 @@ void loop() {
         selectedIndex = activePasswordIndex;
         drawMenu();
       }
-      while (digitalRead(BTN_BACK) == LOW) delay(10);
     }
   }
 
