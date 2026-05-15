@@ -7,10 +7,12 @@
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 
-// ===== LilyGo T-HMI V1.2 Official Pins =====
-#define PWR_ON_PIN  10
-#define BTN_SELECT   0
-#define BTN_BACK    21
+// ===== LilyGo T-HMI V1.2 OFFICIAL PINS =====
+#define PWR_EN_PIN   10
+#define PWR_ON_PIN   14
+#define BTN_SELECT    0
+#define BTN_BACK     21
+#define BK_LIGHT_PIN 38
 
 class LGFX : public lgfx::LGFX_Device {
   lgfx::Panel_ST7789  _panel;
@@ -52,7 +54,7 @@ public:
     }
     {
       auto cfg = _light.config();
-      cfg.pin_bl      = 38;
+      cfg.pin_bl      = BK_LIGHT_PIN;
       cfg.invert      = false;
       cfg.freq        = 44100;
       cfg.pwm_channel = 7;
@@ -65,39 +67,31 @@ public:
 
 LGFX tft;
 
-// ===== Portal =====
 const byte DNS_PORT = 53;
 WebServer   server(80);
 DNSServer   dnsServer;
 Preferences prefs;
 USBHIDKeyboard Keyboard;
 
-// ===== Password Storage =====
 const int MAX_PASSWORDS = 20;
 char passwordNames[MAX_PASSWORDS][32];
 char usernames[MAX_PASSWORDS][64];
 char passwords[MAX_PASSWORDS][64];
 int  passwordCount = 0;
 
-// ===== Menu =====
 enum ScreenState { SCREEN_MAIN, SCREEN_PASSWORDS, SCREEN_ACTIONS, SCREEN_SETTINGS };
 ScreenState currentScreen  = SCREEN_MAIN;
 int selectedIndex          = 0;
 int activePasswordIndex    = 0;
 
-// ===== Portal =====
 bool   portalRunning = false;
 String apPassword    = "12345678";
 
-// ===== Button State =====
 bool btnPressed    = false;
 bool holdTriggered = false;
 unsigned long pressStart = 0;
 const unsigned long HOLD_MS = 700;
 
-// =====================================================
-// LOAD / SAVE
-// =====================================================
 void loadPasswords() {
   prefs.begin("vault", true);
   passwordCount = prefs.getInt("count", 0);
@@ -122,9 +116,6 @@ void savePasswords() {
   prefs.end();
 }
 
-// =====================================================
-// DRAW MENU
-// =====================================================
 void drawMenu() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(2);
@@ -142,10 +133,8 @@ void drawMenu() {
     }
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
     tft.setTextSize(1);
-    tft.setCursor(20, 130);
-    tft.println("Click=scroll  Hold=select");
-    tft.setCursor(20, 145);
-    tft.println("BACK=go back / Settings");
+    tft.setCursor(20, 130); tft.println("Click=scroll  Hold=select");
+    tft.setCursor(20, 145); tft.println("BACK=back / Settings");
   }
 
   else if (currentScreen == SCREEN_PASSWORDS) {
@@ -190,13 +179,10 @@ void drawMenu() {
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
     tft.setTextSize(1);
     tft.setCursor(20, 115); tft.println("Connect WiFi then open browser");
-    tft.setCursor(20, 130); tft.println("Hold BACK button to close portal");
+    tft.setCursor(20, 130); tft.println("Hold BACK to close portal");
   }
 }
 
-// =====================================================
-// SEND
-// =====================================================
 void sendSelected() {
   if (currentScreen != SCREEN_ACTIONS) return;
   tft.fillScreen(TFT_BLACK);
@@ -218,9 +204,6 @@ void sendSelected() {
   drawMenu();
 }
 
-// =====================================================
-// PORTAL
-// =====================================================
 void startPortal() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP("Dr.Passwords", apPassword.c_str());
@@ -238,10 +221,10 @@ void startPortal() {
     html += "th,td{padding:10px;border:1px solid #333;text-align:left;}th{background:#1a1a1a;}</style></head><body>";
     html += "<h2>Dr. Passwords</h2>";
     html += "<form method='POST' action='/save'>";
-    html += "<input name='n' placeholder='Name (e.g. Gmail)'>";
+    html += "<input name='n' placeholder='Name'>";
     html += "<input name='u' placeholder='Username or Email'>";
     html += "<input name='p' placeholder='Password' id='pw'>";
-    html += "<button type='button' class='btn' style='background:#555;' onclick=\"var c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';var s='';for(var i=0;i<16;i++)s+=c[Math.floor(Math.random()*c.length)];document.getElementById('pw').value=s;\">Generate Password</button>";
+    html += "<button type='button' class='btn' style='background:#555;' onclick=\"var c='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';var s='';for(var i=0;i<16;i++)s+=c[Math.floor(Math.random()*c.length)];document.getElementById('pw').value=s;\">Generate</button>";
     html += "<button class='btn' type='submit'>Add Password</button></form>";
     if (passwordCount > 0) {
       html += "<table><tr><th>Name</th><th>Username</th><th></th></tr>";
@@ -267,8 +250,7 @@ void startPortal() {
     pw.toCharArray(passwords[passwordCount], 64);
     passwordCount++;
     savePasswords();
-    server.sendHeader("Location", "/");
-    server.send(302);
+    server.sendHeader("Location", "/"); server.send(302);
   });
 
   server.on("/del", []() {
@@ -283,8 +265,7 @@ void startPortal() {
     passwordCount--;
     if (selectedIndex >= passwordCount && passwordCount > 0) selectedIndex = passwordCount - 1;
     savePasswords();
-    server.sendHeader("Location", "/");
-    server.send(302);
+    server.sendHeader("Location", "/"); server.send(302);
   });
 
   server.onNotFound([]() { server.sendHeader("Location", "/"); server.send(302); });
@@ -295,20 +276,18 @@ void startPortal() {
 
 void stopPortal() {
   if (!portalRunning) return;
-  server.stop();
-  dnsServer.stop();
-  WiFi.softAPdisconnect(true);
-  WiFi.mode(WIFI_OFF);
+  server.stop(); dnsServer.stop();
+  WiFi.softAPdisconnect(true); WiFi.mode(WIFI_OFF);
   portalRunning = false;
 }
 
-// =====================================================
-// SETUP
-// =====================================================
 void setup() {
-  // Power ON - مهم جداً للوحة T-HMI V1.2
+  // ===== Power ON - الترتيب مهم جداً =====
   pinMode(PWR_ON_PIN, OUTPUT);
   digitalWrite(PWR_ON_PIN, HIGH);
+  delay(100);
+  pinMode(PWR_EN_PIN, OUTPUT);
+  digitalWrite(PWR_EN_PIN, HIGH);
   delay(100);
 
   pinMode(BTN_SELECT, INPUT_PULLUP);
@@ -336,9 +315,6 @@ void setup() {
   delay(800);
 }
 
-// =====================================================
-// LOOP
-// =====================================================
 void loop() {
   if (portalRunning) {
     dnsServer.processNextRequest();
@@ -349,66 +325,41 @@ void loop() {
 
   if (btn == LOW) {
     if (!btnPressed) {
-      btnPressed    = true;
-      pressStart    = millis();
-      holdTriggered = false;
+      btnPressed = true; pressStart = millis(); holdTriggered = false;
     } else if (!holdTriggered && millis() - pressStart > HOLD_MS) {
       holdTriggered = true;
       if (currentScreen == SCREEN_ACTIONS) {
         sendSelected();
-      } else if (currentScreen == SCREEN_MAIN) {
-        if (selectedIndex == 0) {
-          currentScreen = SCREEN_PASSWORDS;
-          selectedIndex = 0;
-          drawMenu();
-        }
+      } else if (currentScreen == SCREEN_MAIN && selectedIndex == 0) {
+        currentScreen = SCREEN_PASSWORDS; selectedIndex = 0; drawMenu();
       } else if (currentScreen == SCREEN_PASSWORDS && passwordCount > 0) {
         activePasswordIndex = selectedIndex;
-        currentScreen = SCREEN_ACTIONS;
-        selectedIndex = 0;
-        drawMenu();
+        currentScreen = SCREEN_ACTIONS; selectedIndex = 0; drawMenu();
       }
     }
   } else {
     if (btnPressed && !holdTriggered) {
       int maxItems = 0;
-      if (currentScreen == SCREEN_MAIN)           maxItems = 2;
-      else if (currentScreen == SCREEN_PASSWORDS)  maxItems = max(1, passwordCount);
-      else if (currentScreen == SCREEN_ACTIONS)    maxItems = 3;
-      if (maxItems > 0) {
-        selectedIndex = (selectedIndex + 1) % maxItems;
-        drawMenu();
-      }
+      if (currentScreen == SCREEN_MAIN)          maxItems = 2;
+      else if (currentScreen == SCREEN_PASSWORDS) maxItems = max(1, passwordCount);
+      else if (currentScreen == SCREEN_ACTIONS)   maxItems = 3;
+      if (maxItems > 0) { selectedIndex = (selectedIndex+1) % maxItems; drawMenu(); }
     }
-    btnPressed    = false;
-    holdTriggered = false;
+    btnPressed = false; holdTriggered = false;
   }
 
-  // BACK button
   if (digitalRead(BTN_BACK) == LOW) {
     delay(50);
     if (digitalRead(BTN_BACK) == LOW) {
-      unsigned long backStart = millis();
       while (digitalRead(BTN_BACK) == LOW) delay(10);
-      unsigned long held = millis() - backStart;
-
       if (portalRunning) {
-        stopPortal();
-        currentScreen = SCREEN_MAIN;
-        selectedIndex = 0;
-        drawMenu();
+        stopPortal(); currentScreen = SCREEN_MAIN; selectedIndex = 0; drawMenu();
       } else if (currentScreen == SCREEN_MAIN) {
-        currentScreen = SCREEN_SETTINGS;
-        selectedIndex = 0;
-        startPortal();
+        currentScreen = SCREEN_SETTINGS; selectedIndex = 0; startPortal();
       } else if (currentScreen == SCREEN_PASSWORDS) {
-        currentScreen = SCREEN_MAIN;
-        selectedIndex = 0;
-        drawMenu();
+        currentScreen = SCREEN_MAIN; selectedIndex = 0; drawMenu();
       } else if (currentScreen == SCREEN_ACTIONS) {
-        currentScreen = SCREEN_PASSWORDS;
-        selectedIndex = activePasswordIndex;
-        drawMenu();
+        currentScreen = SCREEN_PASSWORDS; selectedIndex = activePasswordIndex; drawMenu();
       }
     }
   }
