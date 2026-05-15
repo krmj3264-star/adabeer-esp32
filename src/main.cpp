@@ -107,64 +107,55 @@ void drawMenu() {
 
   if (currentScreen == SCREEN_MAIN) {
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.setCursor(20, 10);
-    tft.println("Dr.Passwords");
+    tft.drawString("Dr.Passwords", 20, 10, 2);
     const char* items[] = {"Passwords", "Settings"};
     for (int i = 0; i < 2; i++) {
       if (i == selectedIndex) tft.setTextColor(TFT_BLACK, TFT_GREEN);
       else tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.setCursor(20, 55 + i*35);
-      tft.println(items[i]);
+      tft.drawString(items[i], 20, 55 + i*35, 2);
     }
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.setTextSize(1);
-    tft.setCursor(20, 130); tft.println("Click=scroll  Hold=select");
-    tft.setCursor(20, 145); tft.println("BACK=back / Settings");
+    tft.drawString("Click=scroll  Hold=select", 20, 130, 1);
+    tft.drawString("BACK=back / Settings", 20, 145, 1);
   }
 
   else if (currentScreen == SCREEN_PASSWORDS) {
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.setCursor(20, 10);
-    tft.println("Passwords");
+    tft.drawString("Passwords", 20, 10, 2);
     if (passwordCount == 0) {
       tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-      tft.setCursor(20, 70); tft.println("No passwords yet");
-      tft.setCursor(20, 90); tft.println("Go to Settings to add");
+      tft.drawString("No passwords yet", 20, 70, 1);
+      tft.drawString("Go to Settings to add", 20, 90, 1);
     }
     for (int i = 0; i < passwordCount; i++) {
       if (i == selectedIndex) tft.setTextColor(TFT_BLACK, TFT_GREEN);
       else tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.setCursor(20, 50 + i*28);
-      tft.println(passwordNames[i]);
+      tft.drawString(passwordNames[i], 20, 50 + i*28, 2);
     }
   }
 
   else if (currentScreen == SCREEN_ACTIONS) {
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.setCursor(20, 10);
-    tft.println(passwordNames[activePasswordIndex]);
+    tft.drawString(passwordNames[activePasswordIndex], 20, 10, 2);
     tft.drawFastHLine(0, 38, 240, TFT_DARKGREY);
     const char* actions[] = {"Send Username", "Send Password", "User+Tab+Pass"};
     for (int i = 0; i < 3; i++) {
       if (i == selectedIndex) tft.setTextColor(TFT_BLACK, TFT_GREEN);
       else tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.setCursor(20, 55 + i*35);
-      tft.println(actions[i]);
+      tft.drawString(actions[i], 20, 55 + i*35, 2);
     }
   }
 
   else if (currentScreen == SCREEN_SETTINGS) {
     tft.setTextColor(TFT_GREEN, TFT_BLACK);
-    tft.setCursor(20, 10);
-    tft.println("WiFi Portal");
+    tft.drawString("WiFi Portal", 20, 10, 2);
     tft.drawFastHLine(0, 38, 240, TFT_DARKGREY);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
-    tft.setCursor(20, 50); tft.println("SSID: Dr.Passwords");
-    tft.setCursor(20, 78); tft.print("PASS: "); tft.println(apPassword);
+    tft.drawString("SSID: Dr.Passwords", 20, 50, 2);
+    tft.drawString("PASS: " + apPassword, 20, 78, 2);
     tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-    tft.setTextSize(1);
-    tft.setCursor(20, 115); tft.println("Connect WiFi then open browser");
-    tft.setCursor(20, 130); tft.println("Hold BACK to close portal");
+    tft.drawString("Connect WiFi then open", 20, 115, 1);
+    tft.drawString("Hold BACK to close portal", 20, 130, 1);
   }
 }
 
@@ -175,9 +166,7 @@ void sendSelected() {
   if (currentScreen != SCREEN_ACTIONS) return;
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.setTextSize(2);
-  tft.setCursor(20, 60);
-  tft.println("Sending...");
+  tft.drawString("Sending...", 20, 60, 2);
   delay(300);
   if (selectedIndex == 0) {
     Keyboard.print(usernames[activePasswordIndex]);
@@ -280,10 +269,6 @@ void setup() {
   pinMode(PWR_EN_PIN, OUTPUT);
   digitalWrite(PWR_EN_PIN, HIGH);
   delay(100);
-  pinMode(PWR_ON_PIN, OUTPUT);
-  digitalWrite(PWR_ON_PIN, HIGH);
-  delay(100);
-  pinMode(BK_LIGHT_PIN, OUTPUT);
 
   pinMode(BTN_SELECT, INPUT_PULLUP);
   pinMode(BTN_BACK,   INPUT_PULLUP);
@@ -295,13 +280,9 @@ void setup() {
   setBrightness(16);
 
   tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  tft.setTextSize(3);
-  tft.setCursor(20, 50);
-  tft.println("Dr.Passwords");
-  tft.setTextSize(1);
+  tft.drawString("Dr.Passwords", 20, 50, 2);
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
-  tft.setCursor(20, 95);
-  tft.println("Loading...");
+  tft.drawString("Loading...", 20, 95, 1);
   delay(1200);
 
   loadPasswords();
