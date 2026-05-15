@@ -1,5 +1,5 @@
-#define LGFX_USE_V1
-#include <LovyanGFX.hpp>
+#include <Arduino.h>
+#include <TFT_eSPI.h>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
@@ -7,78 +7,57 @@
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 
-// ===== LilyGo T-HMI V1.2 OFFICIAL PINS =====
+// ===== LilyGo T-HMI V1.2 Official Pins =====
 #define PWR_EN_PIN   10
 #define PWR_ON_PIN   14
+#define BK_LIGHT_PIN 38
 #define BTN_SELECT    0
 #define BTN_BACK     21
-#define BK_LIGHT_PIN 38
 
-class LGFX : public lgfx::LGFX_Device {
-  lgfx::Panel_ST7789  _panel;
-  lgfx::Bus_Parallel8 _bus;
-  lgfx::Light_PWM     _light;
-public:
-  LGFX() {
-    {
-      auto cfg = _bus.config();
-      cfg.freq_write = 20000000;
-      cfg.pin_wr = 8;
-      cfg.pin_rd = -1;
-      cfg.pin_rs = 7;
-      cfg.pin_d0 = 48;
-      cfg.pin_d1 = 47;
-      cfg.pin_d2 = 39;
-      cfg.pin_d3 = 40;
-      cfg.pin_d4 = 41;
-      cfg.pin_d5 = 42;
-      cfg.pin_d6 = 45;
-      cfg.pin_d7 = 46;
-      _bus.config(cfg);
-      _panel.setBus(&_bus);
-    }
-    {
-      auto cfg = _panel.config();
-      cfg.pin_cs   = 6;
-      cfg.pin_rst  = -1;
-      cfg.pin_busy = -1;
-      cfg.panel_width  = 240;
-      cfg.panel_height = 320;
-      cfg.offset_rotation = 1;
-      cfg.invert     = true;
-      cfg.readable   = false;
-      cfg.rgb_order  = false;
-      cfg.dlen_16bit = false;
-      cfg.bus_shared = false;
-      _panel.config(cfg);
-    }
-    {
-      auto cfg = _light.config();
-      cfg.pin_bl      = BK_LIGHT_PIN;
-      cfg.invert      = false;
-      cfg.freq        = 44100;
-      cfg.pwm_channel = 7;
-      _light.config(cfg);
-      _panel.setLight(&_light);
-    }
-    setPanel(&_panel);
+TFT_eSPI tft = TFT_eSPI();
+
+// ===== Backlight =====
+void setBrightness(uint8_t value) {
+  static uint8_t steps = 16;
+  static uint8_t _brightness = 0;
+  if (_brightness == value) return;
+  if (value > 16) value = 16;
+  if (value == 0) {
+    digitalWrite(BK_LIGHT_PIN, 0);
+    delay(3);
+    _brightness = 0;
+    return;
   }
-};
+  if (_brightness == 0) {
+    digitalWrite(BK_LIGHT_PIN, 1);
+    _brightness = steps;
+    delayMicroseconds(30);
+  }
+  int from = steps - _brightness;
+  int to   = steps - value;
+  int num  = (steps + to - from) % steps;
+  for (int i = 0; i < num; i++) {
+    digitalWrite(BK_LIGHT_PIN, 0);
+    digitalWrite(BK_LIGHT_PIN, 1);
+  }
+  _brightness = value;
+}
 
-LGFX tft;
-
+// ===== Portal =====
 const byte DNS_PORT = 53;
 WebServer   server(80);
 DNSServer   dnsServer;
 Preferences prefs;
 USBHIDKeyboard Keyboard;
 
+// ===== Password Storage =====
 const int MAX_PASSWORDS = 20;
 char passwordNames[MAX_PASSWORDS][32];
 char usernames[MAX_PASSWORDS][64];
 char passwords[MAX_PASSWORDS][64];
 int  passwordCount = 0;
 
+// ===== Menu =====
 enum ScreenState { SCREEN_MAIN, SCREEN_PASSWORDS, SCREEN_ACTIONS, SCREEN_SETTINGS };
 ScreenState currentScreen  = SCREEN_MAIN;
 int selectedIndex          = 0;
@@ -92,6 +71,9 @@ bool holdTriggered = false;
 unsigned long pressStart = 0;
 const unsigned long HOLD_MS = 700;
 
+// =====================================================
+// LOAD / SAVE
+// =====================================================
 void loadPasswords() {
   prefs.begin("vault", true);
   passwordCount = prefs.getInt("count", 0);
@@ -116,12 +98,15 @@ void savePasswords() {
   prefs.end();
 }
 
+// =====================================================
+// DRAW MENU
+// =====================================================
 void drawMenu() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextSize(2);
 
   if (currentScreen == SCREEN_MAIN) {
-    tft.setTextColor(TFT_GREEN);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setCursor(20, 10);
     tft.println("Dr.Passwords");
     const char* items[] = {"Passwords", "Settings"};
@@ -138,7 +123,7 @@ void drawMenu() {
   }
 
   else if (currentScreen == SCREEN_PASSWORDS) {
-    tft.setTextColor(TFT_GREEN);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setCursor(20, 10);
     tft.println("Passwords");
     if (passwordCount == 0) {
@@ -155,7 +140,7 @@ void drawMenu() {
   }
 
   else if (currentScreen == SCREEN_ACTIONS) {
-    tft.setTextColor(TFT_GREEN);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setCursor(20, 10);
     tft.println(passwordNames[activePasswordIndex]);
     tft.drawFastHLine(0, 38, 240, TFT_DARKGREY);
@@ -169,7 +154,7 @@ void drawMenu() {
   }
 
   else if (currentScreen == SCREEN_SETTINGS) {
-    tft.setTextColor(TFT_GREEN);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
     tft.setCursor(20, 10);
     tft.println("WiFi Portal");
     tft.drawFastHLine(0, 38, 240, TFT_DARKGREY);
@@ -183,10 +168,13 @@ void drawMenu() {
   }
 }
 
+// =====================================================
+// SEND
+// =====================================================
 void sendSelected() {
   if (currentScreen != SCREEN_ACTIONS) return;
   tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_CYAN);
+  tft.setTextColor(TFT_CYAN, TFT_BLACK);
   tft.setTextSize(2);
   tft.setCursor(20, 60);
   tft.println("Sending...");
@@ -204,6 +192,9 @@ void sendSelected() {
   drawMenu();
 }
 
+// =====================================================
+// PORTAL
+// =====================================================
 void startPortal() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP("Dr.Passwords", apPassword.c_str());
@@ -281,28 +272,34 @@ void stopPortal() {
   portalRunning = false;
 }
 
+// =====================================================
+// SETUP - نفس ترتيب LilyGo الرسمي
+// =====================================================
 void setup() {
-  // ===== Power ON - الترتيب مهم جداً =====
-  pinMode(PWR_ON_PIN, OUTPUT);
-  digitalWrite(PWR_ON_PIN, HIGH);
-  delay(100);
+  // Power ON - نفس الترتيب الرسمي من LilyGo
   pinMode(PWR_EN_PIN, OUTPUT);
   digitalWrite(PWR_EN_PIN, HIGH);
   delay(100);
+  pinMode(PWR_ON_PIN, OUTPUT);
+  digitalWrite(PWR_ON_PIN, HIGH);
+  delay(100);
+  pinMode(BK_LIGHT_PIN, OUTPUT);
 
   pinMode(BTN_SELECT, INPUT_PULLUP);
   pinMode(BTN_BACK,   INPUT_PULLUP);
 
-  tft.init();
+  tft.begin();
   tft.setRotation(1);
-  tft.setBrightness(255);
   tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_GREEN);
+
+  setBrightness(16);
+
+  tft.setTextColor(TFT_GREEN, TFT_BLACK);
   tft.setTextSize(3);
   tft.setCursor(20, 50);
   tft.println("Dr.Passwords");
   tft.setTextSize(1);
-  tft.setTextColor(TFT_DARKGREY);
+  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
   tft.setCursor(20, 95);
   tft.println("Loading...");
   delay(1200);
@@ -315,6 +312,9 @@ void setup() {
   delay(800);
 }
 
+// =====================================================
+// LOOP
+// =====================================================
 void loop() {
   if (portalRunning) {
     dnsServer.processNextRequest();
@@ -340,9 +340,9 @@ void loop() {
   } else {
     if (btnPressed && !holdTriggered) {
       int maxItems = 0;
-      if (currentScreen == SCREEN_MAIN)          maxItems = 2;
-      else if (currentScreen == SCREEN_PASSWORDS) maxItems = max(1, passwordCount);
-      else if (currentScreen == SCREEN_ACTIONS)   maxItems = 3;
+      if (currentScreen == SCREEN_MAIN)           maxItems = 2;
+      else if (currentScreen == SCREEN_PASSWORDS)  maxItems = max(1, passwordCount);
+      else if (currentScreen == SCREEN_ACTIONS)    maxItems = 3;
       if (maxItems > 0) { selectedIndex = (selectedIndex+1) % maxItems; drawMenu(); }
     }
     btnPressed = false; holdTriggered = false;
